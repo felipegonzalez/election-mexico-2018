@@ -1,0 +1,269 @@
+---
+title: "Stan model for Mexican 2018 presidential election quick-count"
+output: html_document
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Abstract
+
+We show an application of a bayesian model built with Stan [@stan], following ideas
+from [@gelman] and [@little] to produce estimates
+for the quick-count for the Mexican 2018 presidential election. The methods presented here
+are derived and very similar from those that were actually used by some members of the commitee which produced official quick-count results in july 2018.
+
+
+
+
+### Introduction
+
+In several countries, [quick-count](https://www.ndi.org/node/24021) methodologies are put
+in place to monitor the progress of elections and to produce early results based on samples
+of polling stations. Tipically a sample of polling stations is selected, efforts are put in 
+place to quickly collect the data from the selected polling stations, and estimates are produced.
+The idea is that that trustworthy results can be published early in the counting process to the 
+general public.
+
+We consider the estimation process. Key considerations are:
+
+1. **Inference**: Methods should produce interval estimates of the final proportion of
+votes received by each candidate, and uncertainty about the final results is clearly stated.
+2. **Calibration**: Methods should produce well calibrated estimates of the uncertainty, so that
+nominal and actual coverage of intervals produced is close. Intervals should be reasonable narrow to be useful in most situations (for example, within one percentage point of actual tallies).
+3. **Performance**: estimation procedures should be fast enough to produce results as the
+batches of data are received, so that partial results can be monitored and decisions can be taken
+as to when publish final estimates. In this case, we establish that the model fitting process
+should no take more than 10 minutes, so that models can be run frequently and partial results can be
+analyzed for correctness.
+4. **Robustness**: tipically, it will be very difficult and costly to obtain the complete designed
+sample, and tests must be carried out considering different types of missing units from the chosen sample. The missingness process is not known, but it is clear that voting results may be correlated with the time it takes to collect polling station data (for example, rural polling stations, close results that require recounting at polling stations, etc).
+
+### Sample
+
+It was decided to use a proportional stratified sample of around 7 thousand 
+polling stations. The stratification variable is very similar to the electoral district
+stratification, and each electoral district contains about *** polling stations. Finally,
+each polling station is designed to cover at most around 750 individual voters.
+
+### Model and data splitting
+
+To obtain a good compromise of the 4 above considerations was obtained by using the following model:
+
+**Data split** Estimates will be produced independently for each of 7 geographical regions and each of 5 candidates (including null votes). This means that it is possible to parallelize the fitting 
+across 35 processes, each process using only a fraction of the data. 
+
+This data split is not desirable from the modelling point of view, as we cannot do partial pooling
+across regions, or model covariance structures among candidates, etc, but it was found that
+gave a good compromise between performance (fitting time), ease of fitting (convergence) and 
+calibration results.
+
+**Model**
+
+For each region and each candidate, the number of votes at polling station $i$ in electoral
+district $k$ was modelled
+as a negative binomial
+
+$$y_{ik} \sim NB(\mu_{ik}, \phi_{ik})$$
+
+where the parametrization chosen is given in [@stanmanual, p. 517]
+$$f(y|\mu,\phi) =  \binom{y+\phi-1}{y} \left(  \frac{\mu}{\mu+\phi}\right)^y\left(  \frac{\phi}{\mu+\phi}\right)^\phi$$
+In this parametrization $\mu$ is the expected value of $y$, and its variance
+is given by $\mu + \mu^2/\phi$.
+
+The choice of negative binomial results from the observation that a simpler, and computationally
+more convenient choice such as a truncated normal distribution resulted in some cases on bad fits
+which produced under-covering intervals, failing posterior predictive diagnostics, and NUTS sampling difficulties (including many divergences). These are in part due to longer
+tails of observed data compared to the normal distribution, in particular with smaller candidates,
+which tend to have some districts where they are extremely popular compared to the rest of the country (see discussion below).
+
+Now we first consider the mean parameter $\mu_{ik}$. The maximum number of possible votes
+for a given candidate is the size of its nominal list $n_{ik}$, which consist of the individual
+personas that can vote in that polling stations (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ the proportion of this listing which
+will vote for the candidate. Then
+
+$$\mu_{ik} = n_{ik}\theta_{ik}.$$
+
+The probability $\theta_{ik}$ is further modelled using covariates at the polling level station, electoral district level and state level:
+
+$$logit(\theta_{ik}) = \beta_0 + \beta_{d(k)} + x_{ik}^t\beta. $$
+where $\beta_{d(k)}$ is the electoral district $d(k)$ effect, $x_{ik}$ is a vector of covariates
+of the polling station: this includes type of polling station (rural or urban, which is a the station level) or state where the polling station is (at the state level).
+
+Furthermore, we model hierarchically
+$$\beta_{d(k)} \sim N(\beta_{st}, \sigma_{st})$$
+
+For the overdispersion parameter, we set
+$$\phi_{ik} = n_{ik}\theta_{ik} \nu_{k},$$
+so that 
+$$Var(y_{ik}) = n_{ik}\theta_{ik} (1 + 1/\nu_{ik})$$
+where $\nu_{ik}$ can be seen as an overdispersion factor from the
+binomial model: the larger it is, the closer
+the individual votes are independent of each other conditional on the covariates. 
+
+Prior settings are
+$$\beta_0 \sim N(-1.5, 2)$$
+$$\beta \sim N(0,I)$$
+$$\beta_{st} \sim N(0, 1)$$
+$$\sigma_{st} \sim N^{+}(0, 1)$$
+$$\nu_{ik} \sim N(1,1)$$
+
+The Stan implementation can be consulted in the (quickcountmx: @R-quickcountmx) package.
+
+**Estimation**
+
+After fitting the model, the straightforward estimation proceeds as follows:
+
+1. For every polling station not in the sample, we simulate its vote counts according to the model.
+2. We aggregate observed values for polling stations with simulated ones, and obtain simulated vote counts for the total of polling stations.
+3. These aggregated results are then summarised to produce vote proportions and corresponding intervals.
+
+### Stan Model
+
+```{r, message=FALSE, warning=FALSE}
+quickcountmx:::stanmodels["neg_binomial_edo"]
+```
+
+### Testing
+
+The above model was tested in several ways:
+
+- Posterior predictive checks were carried out at the strata level and at the polling station level. In these checks the negative binomial model outperformed considerably the simpler 
+normal or binomial model.
+
+- The model was tested against several samples from the 2006 and 2012 elections. In this cases, we tested for incomplete samples, both with and without missing strata, as well as missing strata and samples with missing probability correlated with observed counts (for example, we could remove strata with probability proportional to party vote counts). In all cases, we would check numeric performance, timings, and coverage properties.
+
+We first look at a motivating reason for choosing the negative binomial model. 
+We show an electoral district from the previous 2012 election, and consider
+the distribution of the polling station counts. We will consider what happens
+with the counts of a small party and also a large party.
+
+We we consider simple fits (no covariates) of both a normal model and a negative binomial model.
+In the following graphs, we show observed data with data simulated from fitted
+distributions, including the maximum observed. The negative binomial tends to produce better overall fits, including
+a better behaviour modelling the longer tails of the count data.
+
+```{r, warning = FALSE, message=FALSE}
+library(tidyverse)
+library(quickcountmx)
+data("nal_2012")
+data_out <- nal_2012 %>% filter(distrito_fed_17 == 1) %>% 
+  select(casilla_id, panal, prd_pt_mc) %>% gather(party, counts, -casilla_id) %>% 
+  group_by(party) %>% nest %>%
+  mutate(normal_model = map(data, ~ MASS::fitdistr(.x$counts, "normal")[[1]])) %>% 
+  mutate(binneg_model = map(data, ~ MASS::fitdistr(.x$counts, "negative binomial")[[1]])) %>%
+  mutate(num_sims = nrow(data[[1]])) 
+data_out$normal_sims <- map2(data_out$num_sims, data_out$normal_model, ~ rnorm(.x, .y[1], .y[2]))
+data_out$binneg_sims <- map2(data_out$num_sims, data_out$binneg_model, ~ rnbinom(.x, size=.y[1], mu=.y[2]))
+data_sims <- data_out %>% select(party, data, binneg_sims, normal_sims) %>%
+  unnest %>% gather(type, values, counts, normal_sims, binneg_sims) %>%
+  filter(values >= 0) %>%
+  group_by(type, party) %>% mutate(q_99 = max(values))
+
+ggplot(data_sims %>% filter(party=="panal"), 
+       aes(x = values)) + geom_histogram(binwidth=1) + facet_wrap(~type, ncol=1) +
+    geom_vline(aes(xintercept = q_99), colour="red")
+ggplot(data_sims %>% filter(party=="prd_pt_mc"), 
+       aes(x = values)) + geom_histogram(binwidth=5) + facet_wrap(~type, ncol=1) +
+    geom_vline(aes(xintercept = q_99), colour="red")
+
+```
+
+
+We now check a few runs with samples from the 2006 and 2012 election (warning: this
+code is run on parallel over 35 processes. Each data split takes about 3 minutes to
+run in this example):
+
+
+```{r, warning=FALSE, message=FALSE, cache = TRUE}
+# use same sample size as 2006 quickcount
+sample_1 <- select_sample_prop(nal_2006, stratum = estrato, frac = 0.058, seed = 12)
+fit_2006 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300, seed = 992,
+            partidos = c("pan","pri_pvem", "panal", "prd_pt_conv", "psd", "otros"), 
+            frame = "nal_2006")
+```
+
+```{r}
+fit_2006$post_summary
+```
+
+```{r, warning=FALSE, message=FALSE, cache = TRUE}
+# use same sample size as 2006 quickcount
+sample_1 <- select_sample_prop(nal_2006, stratum = estrato, frac = 0.058, seed = 12)
+fit_2012 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300, seed = 992,
+            partidos = c("pan","pri_pvem", "panal", "prd_pt_conv", "psd", "otros"), 
+            frame = "nal_2006")
+```
+
+```{r}
+fit_2012$post_summary
+```
+
+### Results
+
+We now show results for the sample chosen for the 2018 election:
+
+```{r, message=FALSE}
+library(lubridate)
+files_names <- list.files("data", full.names = TRUE) %>% keep(str_detect(., "anzarut"))
+files_results <- map_df(files_names, ~read_csv(file = .x))
+results <- files_results %>% select(-PART) %>% gather(candidate, prop, RAC:JHRC) %>%
+  spread(LMU, prop) %>% rename(inf = `0`, mean=`1`,sup=`2`)
+results <- results %>% 
+  mutate(hour = ymd_hm(paste0("2018-07-01 ",str_sub(R, 3, 4), ":", str_sub(R,5,6))))
+results_filt <- results %>% filter(hour < ymd_hm("2018-07-01 21:31"))
+```
+
+```{r, fig.width = 8, fig.height = 3}
+ggplot(results_filt, aes(x=hour, y=mean, colour=candidate, group=candidate)) + 
+  geom_line() + geom_point() +
+  geom_ribbon(aes(ymin = inf, ymax = sup), alpha=0.2)
+```
+
+The results at 8:00 pm and 9:30 pm (at closing time of polling stations and 1:30 hours later) are
+
+```{r}
+results %>% filter(hour == ymd_hm("2018-07-01 20:00"))
+results %>% filter(hour == ymd_hm("2018-07-01 23:30"))
+```
+
+With nearly 94\% of stations counted, on July 3, the actual counts are
+
+```{r}
+df_prep <- data_frame(candidate = c('AMLO','RAC','JAMK','JHRC'),
+           prep_94percent = round(c(52.96, 22.50, 16.40, 5.14),1))
+df_prep
+```
+
+And we can check that most of the cases, through all the process,
+the 95\% intervals nearly covered the actual **preliminary**  counts:
+
+
+```{r fig.width = 8, fig.height = 5}
+res_actual <- results_filt %>% left_join(df_prep)
+ggplot(res_actual, aes(x=hour, y=mean, colour=candidate, group=candidate)) + 
+  geom_ribbon(aes(ymin = inf, ymax = sup), alpha=0.2) +
+  geom_hline(aes(yintercept = prep_94percent, colour=candidate))
+```
+
+
+### Advantages of our bayesian method fitted with Stan
+
+- The hierarchical structure allows us to produce estimates with good coverage even in extreme situations where some strata are missing.
+- In every step of the electoral process, the intervals produced by this method tend to move smoothly, with reasonable coverage even with small partial samples.
+- The sensitive Stan diagnostics give early warnings of fitting problems and biased results
+methods.
+- Data splitting allowed us to run models in less than 5-10 minutes.
+
+### Further work
+
+- When strata are missing, the intervals produced tend to be large (close to 99\% coverage),
+as the prior for the $\sigma_st$ parameter is used. Further modelling of this parameter may help.
+- Modelling of covariance between candidates may help with both efficiency and calibration, but this means further optimization efforts should be carried out to mantain run times below
+the needed threshold (10 minutes).
+- Upper truncation of negative binomial may help also in low data situations. Our model, with
+little data, will tend to overestimate total vote counts. Again, this was not included for
+performance reasons, as truncation in the likelihood extends considerably run times for our models.
+- Good convergence statistics were obtained with around 600 NUTS samples (300 warmup), although in some cases the Montecarlo error could be relatively high. Nevertheless, we consistently obtained excellent R-hat mixing and no divergent samples.
+

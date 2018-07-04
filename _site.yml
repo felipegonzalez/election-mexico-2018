@@ -1,0 +1,12 @@
+name: quickcount2018
+navbar:
+  title: ' '
+  left:
+  - text: A Bayesian model for quick-count in Elections
+    href: index.html
+output_dir: _site
+output:
+  html_document:
+    lib_dir: site_libs
+    self_contained: no
+
