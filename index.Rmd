@@ -1,5 +1,9 @@
 ---
 title: "Stan model for Mexican 2018 presidential election quick-count"
+author:
+- Michelle Anzarut
+- Felipe González
+- Teresa Ortiz
 output: html_document
 bibliography: bibliography.bib
 ---
@@ -9,13 +13,18 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 ### Abstract
 
-We show an application of a bayesian model built with Stan [@stan], following ideas
+We show an application of a bayesian hierarchical model built with Stan [@stan], following ideas
 from [@gelman] and [@little] to produce estimates
 for the quick-count for the Mexican 2018 presidential election. The methods presented here
 are derived and very similar from those that were actually used by some members of the commitee which produced official quick-count results in july 2018.
 
-
-
+This model estimates have some advantages and some drawbacks in comparison to
+traditional survey sampling estimation methods (in this case, ratio estimation). Advantages
+include a consistent and **principled treatment of missing data in samples** (which is 
+unavoidable in this setting), more **consistent behaviour when monitoring partial samples**
+as they are recorded during the election process, and **better interval coverage properties when the sample data has serious missing data problems** (including biases in observed data from designed samples, which also naturally appear in this setting). Drawbacks include a **much larger computation effort** and time to obtain results (in the case
+of the model presented here, around five minutes vs less than seconds), and a considerably 
+larger **modelling effort** which requires extensive checks.
 
 ### Introduction
 
@@ -80,7 +89,7 @@ which tend to have some districts where they are extremely popular compared to t
 
 Now we first consider the mean parameter $\mu_{ik}$. The maximum number of possible votes
 for a given candidate is the size of its nominal list $n_{ik}$, which consist of the individual
-personas that can vote in that polling stations (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ the proportion of this listing which
+persons that can vote in that polling stations (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ the proportion of this listing which
 will vote for the candidate. Then
 
 $$\mu_{ik} = n_{ik}\theta_{ik}.$$
@@ -117,7 +126,7 @@ After fitting the model, the straightforward estimation proceeds as follows:
 
 1. For every polling station not in the sample, we simulate its vote counts according to the model.
 2. We aggregate observed values for polling stations with simulated ones, and obtain simulated vote counts for the total of polling stations.
-3. These aggregated results are then summarised to produce vote proportions and corresponding intervals.
+3. These aggregated samples are then summarised to produce vote proportions and corresponding intervals.
 
 ### Stan Model
 
@@ -132,7 +141,7 @@ The above model was tested in several ways:
 - Posterior predictive checks were carried out at the strata level and at the polling station level. In these checks the negative binomial model outperformed considerably the simpler 
 normal or binomial model.
 
-- The model was tested against several samples from the 2006 and 2012 elections. In this cases, we tested for incomplete samples, both with and without missing strata, as well as missing strata and samples with missing probability correlated with observed counts (for example, we could remove strata with probability proportional to party vote counts). In all cases, we would check numeric performance, timings, and coverage properties.
+- The model was tested against several samples from the 2006 and 2012 elections. In these cases, we tested for incomplete samples, both with and without missing strata, as well as missing strata and samples with missing probability correlated with observed counts (for example, we could remove strata with probability proportional to party vote counts). In all cases, we would check numeric performance, timings, and coverage properties.
 
 We first look at a motivating reason for choosing the negative binomial model. 
 We show an electoral district from the previous 2012 election, and consider
@@ -176,7 +185,7 @@ code is run on parallel over 35 processes. Each data split takes about 3 minutes
 run in this example):
 
 
-```{r, warning=FALSE, message=FALSE, cache = TRUE}
+```{r e2006, warning=FALSE, message=FALSE, cache = TRUE}
 # use same sample size as 2006 quickcount
 sample_1 <- select_sample_prop(nal_2006, stratum = estrato, frac = 0.058, seed = 12)
 fit_2006 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300, seed = 992,
@@ -188,10 +197,9 @@ fit_2006 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300,
 fit_2006$post_summary
 ```
 
-```{r, warning=FALSE, message=FALSE, cache = TRUE}
-# use same sample size as 2006 quickcount
-sample_1 <- select_sample_prop(nal_2006, stratum = estrato, frac = 0.058, seed = 12)
-fit_2012 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300, seed = 992,
+```{r e2012, warning=FALSE, message=FALSE, cache = TRUE}
+sample_2 <- select_sample_prop(nal_2012, stratum = estrato, frac = 0.04, seed = 12)
+fit_2012 <- mrp_estimation_stan(sample_2, estrato, n_iter = 700, n_warmup = 300, seed = 992,
             partidos = c("pan","pri_pvem", "panal", "prd_pt_conv", "psd", "otros"), 
             frame = "nal_2006")
 ```
@@ -199,6 +207,10 @@ fit_2012 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300,
 ```{r}
 fit_2012$post_summary
 ```
+
+### Calibration
+
+Add graphs from previous analysis, compared to ratio estimation collapsing strata.
 
 ### Results
 
@@ -265,5 +277,5 @@ the needed threshold (10 minutes).
 - Upper truncation of negative binomial may help also in low data situations. Our model, with
 little data, will tend to overestimate total vote counts. Again, this was not included for
 performance reasons, as truncation in the likelihood extends considerably run times for our models.
-- Good convergence statistics were obtained with around 600 NUTS samples (300 warmup), although in some cases the Montecarlo error could be relatively high. Nevertheless, we consistently obtained excellent R-hat mixing and no divergent samples.
+- Good convergence statistics were obtained with around 600 NUTS samples (300 warmup), although in some cases the montecarlo relative error, as reported in Stan outputs, could be relatively high (but less than 15\%). Nevertheless, we consistently obtained good R-hat mixing and no divergent samples.
 
