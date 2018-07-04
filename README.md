@@ -1,5 +1,5 @@
 # Presidential election, Mexico 2018
-Early quick-count estimation based on sample of polling booths for the Mexican 2018 presidential election.
+This repository contains code for [this explanation](https://blissful-bhaskara-f1ec61.netlify.com) of quick-count estimation based on sample of polling booths for the Mexican 2018 presidential election.
 
 - Estimation based on quick-count sample designed by [COTECORA](http://repositoriodocumental.ine.mx/xmlui/bitstream/handle/123456789/94951/CGor201801-31-ip-16.pdf)
 - Models and code are in the [quickcountmx](https://github.com/tereom/quickcountmx) package.
