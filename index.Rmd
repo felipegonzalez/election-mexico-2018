@@ -21,7 +21,7 @@ are derived and very similar from those that were actually used by some members 
 This model estimates have some advantages and some drawbacks in comparison to
 traditional survey sampling estimation methods (in this case, ratio estimation). Advantages
 include a consistent and **principled treatment of missing data in samples** (which is 
-unavoidable in this setting), more **consistent behaviour when monitoring partial samples**
+unavoidable in this setting), a more **consistent behaviour when monitoring partial samples**
 as they are recorded during the election process, and **better interval coverage properties when the sample data has serious missing data problems** (including biases in observed data from designed samples, which also naturally appear in this setting). Drawbacks include a **much larger computation effort** and time to obtain results (in the case
 of the model presented here, around five minutes vs less than seconds), and a considerably 
 larger **modelling effort** which requires extensive checks.
@@ -32,15 +32,14 @@ In several countries, [quick-count](https://www.ndi.org/node/24021) methodologie
 in place to monitor the progress of elections and to produce early results based on samples
 of polling stations. Tipically a sample of polling stations is selected, efforts are put in 
 place to quickly collect the data from the selected polling stations, and estimates are produced.
-The idea is that that trustworthy results can be published early in the counting process to the 
-general public.
+The idea is that that trustworthy results can be published to the general public early in the counting process.
 
 We consider the estimation process. Key considerations are:
 
 1. **Inference**: Methods should produce interval estimates of the final proportion of
 votes received by each candidate, and uncertainty about the final results is clearly stated.
 2. **Calibration**: Methods should produce well calibrated estimates of the uncertainty, so that
-nominal and actual coverage of intervals produced is close. Intervals should be reasonable narrow to be useful in most situations (for example, within one percentage point of actual tallies).
+nominal and actual coverage of intervals produced is close. Intervals should be reasonably narrow to be useful in most situations (for example, within one percentage point of actual tallies).
 3. **Performance**: estimation procedures should be fast enough to produce results as the
 batches of data are received, so that partial results can be monitored and decisions can be taken
 as to when publish final estimates. In this case, we establish that the model fitting process
@@ -53,19 +52,19 @@ sample, and tests must be carried out considering different types of missing uni
 
 It was decided to use a proportional stratified sample of around 7 thousand 
 polling stations. The stratification variable is very similar to the electoral district
-stratification, and each electoral district contains about *** polling stations. Finally,
-each polling station is designed to cover at most around 750 individual voters.
+stratification, and each stratum contains about 450 polling stations. Finally,
+each polling station is designed to cover at most 750 individual voters.
 
 ### Model and data splitting
 
-To obtain a good compromise of the 4 above considerations was obtained by using the following model:
+A good compromise of the 4 considerations above was obtained by using the following model:
 
 **Data split** Estimates will be produced independently for each of 7 geographical regions and each of 5 candidates (including null votes). This means that it is possible to parallelize the fitting 
 across 35 processes, each process using only a fraction of the data. 
 
 This data split is not desirable from the modelling point of view, as we cannot do partial pooling
-across regions, or model covariance structures among candidates, etc, but it was found that
-gave a good compromise between performance (fitting time), ease of fitting (convergence) and 
+across regions, or model covariance structures among candidates, etc, but it was found to
+give a good compromise between performance (fitting time), ease of fitting (convergence) and 
 calibration results.
 
 **Model**
@@ -89,7 +88,7 @@ which tend to have some districts where they are extremely popular compared to t
 
 Now we first consider the mean parameter $\mu_{ik}$. The maximum number of possible votes
 for a given candidate is the size of its nominal list $n_{ik}$, which consist of the individual
-persons that can vote in that polling stations (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ the proportion of this listing which
+persons that can vote in that polling station (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ the proportion of this list which
 will vote for the candidate. Then
 
 $$\mu_{ik} = n_{ik}\theta_{ik}.$$
