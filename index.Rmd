@@ -190,7 +190,7 @@ run in this example):
 sample_1 <- select_sample_prop(nal_2006, stratum = estrato, frac = 0.058, seed = 12)
 fit_2006 <- mrp_estimation_stan(sample_1, estrato, n_iter = 700, n_warmup = 300, seed = 992,
             partidos = c("pan","pri_pvem", "panal", "prd_pt_conv", "psd", "otros"), 
-            frame = "nal_2012")
+            frame = "nal_2006")
 ```
 
 ```{r}
@@ -201,10 +201,10 @@ actual_2006 <- nal_2006 %>% select(casilla_id, pri_pvem:otros) %>%
 fit_2006$post_summary %>% select(party, int_l, int_r) %>% left_join(actual_2006)
 ```
 
-```{r e2012, warning=FALSE, message=FALSE, cache = TRUE}
+```{r e2012, warning=FALSE, message=FALSE}
 sample_2 <- select_sample_prop(nal_2012, stratum = estrato, frac = 0.04, seed = 12)
 fit_2012 <- mrp_estimation_stan(sample_2, estrato, n_iter = 700, n_warmup = 300, seed = 992,
-            partidos = c("pan","pri_pvem", "panal", "prd_pt_conv", "psd", "otros"), 
+            partidos = c("pan", "pri_pvem", "panal", "prd_pt_mc", "otros"), 
             frame = "nal_2012")
 ```
 
@@ -213,7 +213,7 @@ actual_2012 <- nal_2012 %>% select(casilla_id, pri_pvem:otros) %>%
   gather(party, votes, pri_pvem:otros) %>%
   group_by(party) %>% summarise(actual_votes = sum(votes)) %>%
   mutate(actual = 100 * actual_votes / sum(actual_votes)) %>% select(party, actual)
-fit_2012$post_summary %>% select(party, int_l, int_r) %>% left_join(actual_2006)
+fit_2012$post_summary %>% select(party, int_l, int_r) %>% left_join(actual_2012)
 ```
 
 ### Calibration
