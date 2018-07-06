@@ -138,10 +138,13 @@ quickcountmx:::stanmodels["neg_binomial_edo"]
 
 The above model was tested in several ways:
 
+
+- The model was tested against several samples from the 2006 and 2012 elections. In these cases, we tested for incomplete samples, both with and without missing strata, as well as missing strata and samples with missing probability correlated with observed counts (for example, we could remove strata with probability proportional to party vote counts). In all cases, we would check numeric performance, timings, and coverage properties.
+
 - Posterior predictive checks were carried out at the strata level and at the polling station level. In these checks the negative binomial model outperformed considerably the simpler 
 normal or binomial model.
 
-- The model was tested against several samples from the 2006 and 2012 elections. In these cases, we tested for incomplete samples, both with and without missing strata, as well as missing strata and samples with missing probability correlated with observed counts (for example, we could remove strata with probability proportional to party vote counts). In all cases, we would check numeric performance, timings, and coverage properties.
+
 
 We first look at a motivating reason for choosing the negative binomial model. 
 We show an electoral district from the previous 2012 election, and consider
@@ -156,6 +159,7 @@ a better behaviour modelling the longer tails of the count data.
 ```{r, warning = FALSE, message=FALSE}
 library(tidyverse)
 library(quickcountmx)
+library(gridExtra)
 data("nal_2012")
 data_out <- nal_2012 %>% filter(distrito_fed_17 == 1) %>% 
   select(casilla_id, panal, prd_pt_mc) %>% gather(party, counts, -casilla_id) %>% 
@@ -168,15 +172,15 @@ data_out$binneg_sims <- map2(data_out$num_sims, data_out$binneg_model, ~ rnbinom
 data_sims <- data_out %>% select(party, data, binneg_sims, normal_sims) %>%
   unnest %>% gather(type, values, counts, normal_sims, binneg_sims) %>%
   filter(values >= 0) %>%
-  group_by(type, party) %>% mutate(q_99 = max(values))
-
-ggplot(data_sims %>% filter(party=="panal"), 
+  group_by(type, party) %>% mutate(max = max(values))
+data_sims$type[data_sims$type=="counts"] <- "observed counts"
+p1 <- ggplot(data_sims %>% filter(party=="panal"), 
        aes(x = values)) + geom_histogram(binwidth=1) + facet_wrap(~type, ncol=1) +
-    geom_vline(aes(xintercept = q_99), colour="red")
-ggplot(data_sims %>% filter(party=="prd_pt_mc"), 
+    geom_vline(aes(xintercept = max), colour="red") + xlab("Number of votes") + ylab("")
+p2 <- ggplot(data_sims %>% filter(party=="prd_pt_mc"), 
        aes(x = values)) + geom_histogram(binwidth=5) + facet_wrap(~type, ncol=1) +
-    geom_vline(aes(xintercept = q_99), colour="red")
-
+    geom_vline(aes(xintercept = max), colour="red") + xlab("Number of votes") + ylab("")
+grid.arrange(p1, p2, nrow = 1)
 ```
 
 
@@ -217,6 +221,8 @@ fit_2012$post_summary %>% select(party, int_l, int_r) %>% left_join(actual_2012)
 ```
 
 ### Calibration
+
+The most important testing
 
 **TODO: Add graphs from previous analysis, compared to ratio estimation collapsing strata.**
 
