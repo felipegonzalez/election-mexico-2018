@@ -53,19 +53,19 @@ sample, and tests must be carried out considering different types of missing uni
 
 It was decided to use a proportional stratified sample of around 7 thousand 
 polling stations. The stratification variable is very similar to the electoral district
-stratification, and each electoral district contains about *** polling stations. Finally,
+stratification, and each stratum contains about 450 polling stations. Finally,
 each polling station is designed to cover at most around 750 individual voters.
 
 ### Model and data splitting
 
-To obtain a good compromise of the 4 above considerations was obtained by using the following model:
+A good compromise of the 4 above considerations was obtained by using the following model:
 
 **Data split** Estimates will be produced independently for each of 7 geographical regions and each of 5 candidates (including null votes). This means that it is possible to parallelize the fitting 
 across 35 processes, each process using only a fraction of the data. 
 
 This data split is not desirable from the modelling point of view, as we cannot do partial pooling
-across regions, or model covariance structures among candidates, etc, but it was found that
-gave a good compromise between performance (fitting time), ease of fitting (convergence) and 
+across regions, or model covariance structures among candidates, etc, but it was found to
+give a good compromise between performance (fitting time), ease of fitting (convergence) and 
 calibration results.
 
 **Model**
@@ -89,7 +89,7 @@ which tend to have some districts where they are extremely popular compared to t
 
 Now we first consider the mean parameter $\mu_{ik}$. The maximum number of possible votes
 for a given candidate is the size of its nominal list $n_{ik}$, which consist of the individual
-persons that can vote in that polling stations (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ the proportion of this listing which
+persons that can vote in that polling stations (there are some polling stations which are of a different type, but we ignore this for now). Let $\theta_{ik}$ be the proportion of this listing which
 will vote for the candidate. Then
 
 $$\mu_{ik} = n_{ik}\theta_{ik}.$$
