@@ -1,0 +1,143 @@
+---
+title: "Calibración Nacional"
+output:
+  html_document:
+    css: ../../codigo-estilos/cajas.css
+    theme: spacelab
+---
+
+Se presentan gráficas para equipos individuales, equipos de 3 y consolidados
+finales considerando media, mediana y unión.
+
+```{r setup, echo = FALSE, fig.align="center", message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.align="center", message = FALSE, 
+    fig.width = 7.5, 
+    warning = FALSE, cache = FALSE)
+```
+
+```{r funciones}
+library(quickcountmx)
+library(tidyverse)
+library(fs)
+library(stringr)
+library(kableExtra)
+
+recode_party <- function(x){
+    case_when(
+        x == "otros" ~ "OTROS", 
+        x == "pan" ~ "CPAN", 
+        x == "panal" ~ "CPANAL", 
+        x == "prd_pt_mc" ~ "CPRD", 
+        x == "pri_pvem" ~ "CPRI", 
+        x == "participacion" ~ "PARTICIPACION"
+        )
+}
+
+plot_calib <- function(data_plot, equipo_plot = "LE"){
+    plot_c <- ggplot(data_plot) +
+        geom_linerange(data = data_plot, aes(x = n_muestra, ymin = LI, 
+            ymax = LS), alpha = 0) +
+        geom_linerange(data = filter(data_plot, equipo == equipo_plot), 
+            aes(x = n_muestra, ymin = LI, ymax = LS), alpha = 0.5) +
+        facet_grid(partido ~ tipo, scales = "free_y") +
+        geom_hline(data = filter(data_plot, equipo == equipo_plot), 
+            aes(yintercept = prop_votes), color = "red", alpha = 0.5) +
+        labs(subtitle = str_c("Intervals: ", equipo_plot)) +
+        theme_minimal() +
+        xlab("samples")
+    print(plot_c)
+}
+```
+
+
+
+### Resultados individuales
+
+Presentamos los resultados de las muestras nacionales para los equipos 
+sencillos.
+
+```{r}
+nal_calib_ind <- read_rds("intervals_ratio_model.rdata")
+```
+
+
+
+Las graficas muestran los intervalos estimados bajo los escenarios de muestras
+completas, casillas faltantes y estratos faltantes. La línea horizontal indica
+la proporción calculada del marco muestral.
+
+```{r}
+equipos_ind <- unique(nal_calib_ind$equipo)
+walk(equipos_ind, ~plot_calib(nal_calib_ind, .))
+```
+
+En la siguiente gráfica las barras indican la presición media y los números la
+cobertura.
+
+```{r}
+nal_calib_ind_prec_cob <- nal_calib_ind %>% 
+    mutate(
+        precision = (LS - LI) / 2,
+        cubre = LI < prop_votes & LS > prop_votes, 
+        n_muestra_factor = reorder(factor(n_muestra), precision)
+        )
+
+tab_coberturas_ind_long <- nal_calib_ind_prec_cob %>% 
+    group_by(equipo, partido, tipo) %>% 
+    summarise(
+        cobertura = round(100 * mean(cubre)) 
+        ) 
+
+tab_coberturas_ind <- tab_coberturas_ind_long %>% 
+    spread(equipo, cobertura) %>% 
+    arrange(tipo) 
+```
+
+```{r, fig.width=7.5, fig.height = 7}
+tab_precisiones_ind <- nal_calib_ind_prec_cob %>% 
+    group_by(equipo, partido, tipo) %>% 
+    summarise(
+        precision = round(mean(precision), 2) 
+        ) %>% 
+    spread(equipo, precision) %>% 
+    arrange(tipo) 
+
+party_colors <- c(CPAN = "#3399FF", CPRI = "#FF0000", CPRD = "#FFCC00", 
+    CPANAL = "#80DEEA", OTHER = "gray60")
+
+tab_plot_ind_precision <- tab_precisiones_ind %>% 
+    gather(equipo, precision, -partido, -tipo) %>%
+    left_join(tab_coberturas_ind_long)
+
+ggplot(tab_plot_ind_precision, aes(x = equipo, y = precision, 
+    fill = reorder(partido, precision))) +
+    geom_col(position = "dodge", alpha = 0.6) +
+    facet_wrap(~tipo, ncol = 2) + 
+    geom_text(aes(label = cobertura), position = position_dodge(width = 1), 
+        vjust = 0, size = 3, color = "gray20") +
+    scale_fill_manual(values = party_colors) +
+    theme_minimal() +
+    ylim(0, 0.6) +
+    labs(fill = "", x = "", y = "precisión")
+
+```
+
+Y presentamos los resultados en una tabla.
+
+```{r}
+tab_print_ind <- tab_coberturas_ind %>% 
+    left_join(tab_precisiones_ind, by = c("partido", "tipo")) %>% 
+    select(-tipo) 
+
+tab_print_ind %>% 
+    knitr::kable("html", 
+        col.names = c("", str_replace(colnames(tab_print_ind)[-1], "[.].+", "")), 
+        align = c("r", "l", "l", "l", "l", "l", "l", "l", "l")) %>% 
+    kable_styling(full_width = F) %>% 
+    column_spec(3, border_right = T) %>% 
+    group_rows("complete", 1, 5) %>%
+    group_rows("missing at random", 6, 10) %>% 
+    group_rows("missing polling stations", 11, 16) %>% 
+    group_rows("missing strata (biased)", 16, 20) 
+
+```
