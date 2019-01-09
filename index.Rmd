@@ -38,13 +38,13 @@ general public.
 We consider the estimation process. Key considerations are:
 
 1. **Inference**: Methods should produce interval estimates of the final proportion of
-votes received by each candidate, and uncertainty about the final results is clearly stated.
+votes received by each candidate, and uncertainty about the final results should be clearly stated.
 2. **Calibration**: Methods should produce well calibrated estimates of the uncertainty, so that
-nominal and actual coverage of intervals produced is close. Intervals should be reasonable narrow to be useful in most situations (for example, within one percentage point of actual tallies).
+nominal and actual coverage of the intervals produced is close. Intervals should be reasonable narrow to be useful in most situations (for example, within one percentage point of actual tallies).
 3. **Performance**: estimation procedures should be fast enough to produce results as the
 batches of data are received, so that partial results can be monitored and decisions can be taken
 as to when publish final estimates. In this case, we establish that the model fitting process
-should no take more than 10 minutes, so that models can be run frequently and partial results can be
+should not take more than 10 minutes, so that models can be run frequently and partial results can be
 analyzed for correctness.
 4. **Robustness**: tipically, it will be very difficult and costly to obtain the complete designed
 sample, and tests must be carried out considering different types of missing units from the chosen sample. The missingness process is not known, but it is clear that voting results may be correlated with the time it takes to collect polling station data (for example, rural polling stations, close results that require recounting at polling stations, etc).
@@ -54,11 +54,11 @@ sample, and tests must be carried out considering different types of missing uni
 It was decided to use a proportional stratified sample of around 7 thousand 
 polling stations. The stratification variable is very similar to the electoral district
 stratification, and each stratum contains about 450 polling stations. Finally,
-each polling station is designed to cover at most around 750 individual voters.
+each polling station is designed to cover at most 750 individual voters.
 
 ### Model and data splitting
 
-A good compromise of the 4 above considerations was obtained by using the following model:
+A good compromise of the 4 considerations stated above was obtained by using the following model:
 
 **Data split** Estimates will be produced independently for each of 7 geographical regions and each of 5 candidates (including null votes). This means that it is possible to parallelize the fitting 
 across 35 processes, each process using only a fraction of the data. 
